@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopping-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  APP_ENV: "workshop"
+  LOG_LEVEL: "info"
+  POSTGRES_DB: "shop"
+  POSTGRES_USER: "shopuser"
+  PRODUCT_API_HOST: "product-service"
+  ORDER_API_HOST: "order-service"
+  NGINX_ENVSUBST_FILTER: "PRODUCT_API_HOST|ORDER_API_HOST"

@@ -1,0 +1,17 @@
+global:
+  namespace: dev
+
+frontend:
+  image:
+    repository: devpipeline/online-shop
+    tag: "frontend-v3"
+
+productApi:
+  image:
+    repository: devpipeline/online-shop
+    tag: "product-v3"
+
+orderApi:
+  image:
+    repository: devpipeline/online-shop
+    tag: "order-v3"	

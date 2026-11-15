@@ -1,0 +1,310 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.global.namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: {{ .Values.global.namespace }}
+spec:
+  # Keep one replica: multiple PostgreSQL Pods must not share one PGDATA directory.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      # The PostgreSQL image runs as UID 999. fsGroup grants access to the EBS volume.
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        # Prepare the two Pod/worker-local demo mounts for the postgres user.
+        - name: prepare-demo-directories
+          image: busybox:1.36
+          command: ["sh", "-c", "mkdir -p /backups && chmod 0777 /backups && chmod 1777 /tmp"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: postgres-backups
+              mountPath: /backups
+            - name: postgres-temp
+              mountPath: /tmp
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: shopping-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: shopping-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shopping-secret
+                  key: POSTGRES_PASSWORD
+            # Keep PostgreSQL data in the EBS-backed PVC.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            # Persistent database storage backed by an Amazon EBS gp3 volume.
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            # emptyDir: temporary files; contents disappear when the Pod is removed.
+            - name: postgres-temp
+              mountPath: /tmp
+            # hostPath: workshop backup files on the worker node hosting this Pod.
+            - name: postgres-backups
+              mountPath: /backups
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data-pvc
+        - name: postgres-temp
+          emptyDir: {}
+        - name: postgres-backups
+          hostPath:
+            path: /var/lib/postgresql/backups
+            type: DirectoryOrCreate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}
+          ports:
+            - name: http
+              containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: shopping-config
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-api
+  namespace: {{ .Values.global.namespace }}
+spec:
+  # One replica because its EBS PVC uses ReadWriteOnce access mode.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-api
+  template:
+    metadata:
+      labels:
+        app: product-api
+    spec:
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: product-api
+          image: devpipeline/online-shop:product-v3
+          ports:
+            - name: http
+              containerPort: 5001
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: shopping-secret
+                  key: DATABASE_URL
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: shopping-config
+                  key: APP_ENV
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: shopping-config
+                  key: LOG_LEVEL
+            - name: SHARED_DIR
+              value: /shared
+          volumeMounts:
+            - name: product-api-data
+              mountPath: /shared
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: product-api-data
+          persistentVolumeClaim:
+            claimName: product-api-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: product-api
+  ports:
+    - name: http
+      port: 5001
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-api
+  namespace: {{ .Values.global.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-api
+  template:
+    metadata:
+      labels:
+        app: order-api
+    spec:
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: order-api
+          image: devpipeline/online-shop:order-v3
+          ports:
+            - name: http
+              containerPort: 5002
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: shopping-secret
+                  key: DATABASE_URL
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: shopping-config
+                  key: APP_ENV
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: shopping-config
+                  key: LOG_LEVEL
+            - name: SHARED_DIR
+              value: /shared
+          volumeMounts:
+            - name: order-api-data
+              mountPath: /shared
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: order-api-data
+          persistentVolumeClaim:
+            claimName: order-api-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: order-api
+  ports:
+    - name: http
+      port: 5002
+      targetPort: http
