@@ -5,7 +5,7 @@ on:
       - main
     paths:
       - 'shopping/**'
-      - '.github/workflows/ci.yaml'
+      - '.github/workflows/ci.yml'
 
   workflow_dispatch:
 
