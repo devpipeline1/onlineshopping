@@ -50,4 +50,4 @@ jobs:
           file: ./shopping/${{ matrix.service }}/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/online-shop-${{ matrix.service }}:${{ github.run_id }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/online-shop:${{ matrix.service }}-${{ github.run_id }}
