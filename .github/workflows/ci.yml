@@ -1,0 +1,51 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'shopping/**'
+      - '.github/workflows/ci.yaml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - frontend
+          - product-api
+          - order-api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push ${{ matrix.service }} Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./shopping/${{ matrix.service }}
+          file: ./shopping/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/online-shop-${{ matrix.service }}:${{ github.run_id }}
