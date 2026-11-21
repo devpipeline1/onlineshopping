@@ -7,8 +7,8 @@ frontend:
 productApi:
   image:
     repository: devpipeline/online-shop
-    tag: "product-v3"
+    tag: "product-44873819609"
 orderApi:
   image:
     repository: devpipeline/online-shop
-    tag: "order-v3"
+    tag: "order-44873819609"
