@@ -80,10 +80,10 @@ jobs:
 
       - name: Commit and Push Helm Changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "devpipeline"
+          git config user.email "devpipeline@gmail.com"
 
-          git add helm/values.yaml
+          git add helm/shopping-chart/values.yaml
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
