@@ -3,12 +3,12 @@ global:
 frontend:
   image:
     repository: devpipeline/online-shop
-    tag: "frontend-api-44875019477"
+    tag: "frontend-api-44882051987"
 productApi:
   image:
     repository: devpipeline/online-shop
-    tag: "product-api-44875019477"
+    tag: "product-api-44882051987"
 orderApi:
   image:
     repository: devpipeline/online-shop
-    tag: "order-api-44875019477"
+    tag: "order-api-44882051987"
