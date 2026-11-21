@@ -72,9 +72,9 @@ jobs:
         uses: mikefarah/yq@v4.44.3
         with:
           cmd: |
-            yq -i '.frontend.image.tag = "frontend-" + strenv(IMAGE_TAG)' helm/values.yaml
-            yq -i '.productApi.image.tag = "product-api-" + strenv(IMAGE_TAG)' helm/values.yaml
-            yq -i '.orderApi.image.tag = "order-api-" + strenv(IMAGE_TAG)' helm/values.yaml
+            yq -i '.frontend.image.tag = "frontend-" + strenv(IMAGE_TAG)' helm/shopping-chart/values.yaml
+            yq -i '.productApi.image.tag = "product-api-" + strenv(IMAGE_TAG)' helm/shopping-chart/values.yaml
+            yq -i '.orderApi.image.tag = "order-api-" + strenv(IMAGE_TAG)' helm/shopping-chart/values.yaml
         env:
           IMAGE_TAG: ${{ github.run_id }}
 
