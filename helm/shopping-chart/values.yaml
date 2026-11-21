@@ -1,17 +1,14 @@
 global:
   namespace: dev
-
 frontend:
   image:
     repository: devpipeline/online-shop
-    tag: "frontend-v3"
-
+    tag: "frontend-44868711653"
 productApi:
   image:
     repository: devpipeline/online-shop
-    tag: "product-v3"
-
+    tag: "product-api-44868711653"
 orderApi:
   image:
     repository: devpipeline/online-shop
-    tag: "order-v3"	
+    tag: "order-api-44868711653"
