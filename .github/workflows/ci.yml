@@ -24,9 +24,9 @@ jobs:
     strategy:
       matrix:
         service:
-          - frontend
-          - product
-          - order
+          - frontend-api
+          - product-api
+          - order-api
 
     steps:
       - name: Checkout repository
